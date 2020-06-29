@@ -1,5 +1,7 @@
 package core
 
+import "strings"
+
 // location inside input source
 type location struct {
 	line uint
@@ -18,6 +20,33 @@ type Token struct {
 	kind  tokenKind
 	loc   location
 }
+
+type keyword string
+
+const (
+	selectKeyword     keyword = "select"
+	fromKeyword       keyword = "from"
+	asKeyword         keyword = "as"
+	tableKeyword      keyword = "table"
+	createKeyword     keyword = "create"
+	dropKeyword       keyword = "drop"
+	insertKeyword     keyword = "insert"
+	intoKeyword       keyword = "into"
+	valuesKeyword     keyword = "values"
+	intKeyword        keyword = "int"
+	textKeyword       keyword = "text"
+	boolKeyword       keyword = "boolean"
+	whereKeyword      keyword = "where"
+	andKeyword        keyword = "and"
+	orKeyword         keyword = "or"
+	trueKeyword       keyword = "true"
+	falseKeyword      keyword = "false"
+	uniqueKeyword     keyword = "unique"
+	indexKeyword      keyword = "index"
+	onKeyword         keyword = "on"
+	primarykeyKeyword keyword = "primary key"
+	nullKeyword       keyword = "null"
+)
 
 type symbol string
 
@@ -43,6 +72,9 @@ type tokenKind uint
 const (
 	numericKind tokenKind = iota
 	symbolKind
+	keywordKind
+	boolKind
+	nullKind
 )
 
 // LexParse parse input to a list of tokens.
@@ -69,6 +101,62 @@ func LexParse(input string) ([]*Token, error) {
 }
 
 type lexerImpl func(string, cursor) (*Token, cursor, bool)
+
+func keywordLexer(source string, ic cursor) (*Token, cursor, bool) {
+	cur := ic
+	keywords := []keyword{
+		selectKeyword,
+		insertKeyword,
+		valuesKeyword,
+		tableKeyword,
+		createKeyword,
+		dropKeyword,
+		whereKeyword,
+		fromKeyword,
+		intoKeyword,
+		textKeyword,
+		boolKeyword,
+		intKeyword,
+		andKeyword,
+		orKeyword,
+		asKeyword,
+		trueKeyword,
+		falseKeyword,
+		uniqueKeyword,
+		indexKeyword,
+		onKeyword,
+		primarykeyKeyword,
+		nullKeyword,
+	}
+
+	var options []string
+	for _, k := range keywords {
+		options = append(options, string(k))
+	}
+
+	match := pickFrom(source, ic, options)
+	if match == "" {
+		return nil, ic, false
+	}
+
+	cur.pointer = ic.pointer + uint(len(match))
+	cur.loc.col = ic.loc.col + uint(len(match))
+
+	kind := keywordKind
+	if match == string(trueKeyword) || match == string(falseKeyword) {
+		kind = boolKind
+	}
+
+	if match == string(nullKeyword) {
+		kind = nullKind
+	}
+
+	return &Token{
+		value: match,
+		kind:  kind,
+		loc:   ic.loc,
+	}, cur, true
+}
 
 func symbolLexer(source string, ic cursor) (*Token, cursor, bool) {
 	c := source[ic.pointer]
@@ -129,12 +217,14 @@ func symbolLexer(source string, ic cursor) (*Token, cursor, bool) {
 }
 
 func pickFrom(source string, ic cursor, candidates []string) string {
+	lowerSource := strings.ToLower(source)
 	cur := ic
 
 	for _, candidate := range candidates {
-		currentLetter := source[cur.pointer]
 		canBe := true
 		for _, candidateLetter := range candidate {
+			currentLetter := lowerSource[cur.pointer]
+
 			if rune(currentLetter) != candidateLetter {
 				canBe = false
 				break
@@ -146,6 +236,8 @@ func pickFrom(source string, ic cursor, candidates []string) string {
 		if canBe {
 			return candidate
 		}
+
+		cur.pointer = ic.pointer
 	}
 
 	return ""

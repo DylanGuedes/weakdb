@@ -96,3 +96,49 @@ func TestSymbolLexer(t *testing.T) {
 		}
 	}
 }
+
+func TestKeywordLexer(t *testing.T) {
+	tests := []struct {
+		expectedIsKeyword bool
+		input             string
+	}{
+		{
+			expectedIsKeyword: true,
+			input:             "as",
+		},
+		{
+			expectedIsKeyword: true,
+			input:             "select ",
+		},
+		{
+			expectedIsKeyword: true,
+			input:             "from",
+		},
+		{
+			expectedIsKeyword: true,
+			input:             "SELECT",
+		},
+		{
+			expectedIsKeyword: true,
+			input:             "into",
+		},
+		// false tests
+		{
+			expectedIsKeyword: false,
+			input:             " into",
+		},
+		{
+			expectedIsKeyword: false,
+			input:             "flubbrety",
+		},
+	}
+
+	for _, test := range tests {
+		tok, _, ok := keywordLexer(test.input, cursor{})
+		assert.Equal(t, test.expectedIsKeyword, ok, test.input)
+		if ok {
+			test.input = strings.TrimSpace(test.input)
+			assert.Equal(t, strings.ToLower(test.input), tok.value, test.input)
+		}
+	}
+}
