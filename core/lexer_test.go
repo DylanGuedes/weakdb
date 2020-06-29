@@ -1,6 +1,7 @@
 package core
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -67,6 +68,31 @@ func TestNumberLexer(t *testing.T) {
 
 		if ok {
 			assert.Equal(t, test.expectedValue, gotToken.value)
+		}
+	}
+}
+
+func TestSymbolLexer(t *testing.T) {
+	tests := []struct {
+		symbol bool
+		value  string
+	}{
+		{
+			symbol: true,
+			value:  "= ",
+		},
+		{
+			symbol: true,
+			value:  "||",
+		},
+	}
+
+	for _, test := range tests {
+		tok, _, ok := symbolLexer(test.value, cursor{})
+		assert.Equal(t, test.symbol, ok, test.value)
+		if ok {
+			test.value = strings.TrimSpace(test.value)
+			assert.Equal(t, test.value, tok.value, test.value)
 		}
 	}
 }
