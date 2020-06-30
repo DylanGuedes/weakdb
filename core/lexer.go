@@ -75,12 +75,14 @@ const (
 	keywordKind
 	boolKind
 	nullKind
+	stringKind
+	identifierKind
 )
 
 // LexParse parse input to a list of tokens.
 func LexParse(input string) ([]*Token, error) {
 	var tokens []*Token
-	lexers := []lexerImpl{numberLexer}
+	lexers := []lexerImpl{keywordLexer, symbolLexer, numberLexer}
 
 	cur := cursor{}
 
@@ -267,4 +269,93 @@ func numberLexer(input string, ptr cursor) (*Token, cursor, bool) {
 		loc:   ptr.loc,
 		kind:  numericKind,
 	}, ptr, true
+}
+
+// lexCharacterDelimited looks through a source string starting at the
+// given cursor to find a start- and end- delimiter. The delimiter can
+// be escaped be preceeding the delimiter with itself
+func lexCharacterDelimited(source string, ic cursor, delimiter byte) (*Token, cursor, bool) {
+	cur := ic
+
+	if len(source[cur.pointer:]) == 0 {
+		return nil, ic, false
+	}
+
+	if source[cur.pointer] != delimiter {
+		return nil, ic, false
+	}
+
+	cur.loc.col++
+	cur.pointer++
+
+	var value []byte
+	for ; cur.pointer < uint(len(source)); cur.pointer++ {
+		c := source[cur.pointer]
+
+		if c == delimiter {
+			// SQL escapes are via double characters, not backslash.
+			if cur.pointer+1 >= uint(len(source)) || source[cur.pointer+1] != delimiter {
+				cur.pointer++
+				cur.loc.col++
+				return &Token{
+					value: string(value),
+					loc:   ic.loc,
+					kind:  stringKind,
+				}, cur, true
+			}
+			value = append(value, delimiter)
+			cur.pointer++
+			cur.loc.col++
+		}
+
+		value = append(value, c)
+		cur.loc.col++
+	}
+
+	return nil, ic, false
+}
+
+func identifierLexer(source string, ic cursor) (*Token, cursor, bool) {
+	// Handle separately if is a double-quoted identifier
+	if token, newCursor, ok := lexCharacterDelimited(source, ic, '"'); ok {
+		return token, newCursor, true
+	}
+
+	cur := ic
+
+	c := source[cur.pointer]
+	// Other characters count too, big ignoring non-ascii for now
+	isAlphabetical := (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+	if !isAlphabetical {
+		return nil, ic, false
+	}
+	cur.pointer++
+	cur.loc.col++
+
+	value := []byte{c}
+	for ; cur.pointer < uint(len(source)); cur.pointer++ {
+		c = source[cur.pointer]
+
+		// Other characters count too, big ignoring non-ascii for now
+		isAlphabetical := (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+		isNumeric := c >= '0' && c <= '9'
+		if isAlphabetical || isNumeric || c == '$' || c == '_' {
+			value = append(value, c)
+			cur.loc.col++
+			continue
+		}
+
+		break
+	}
+
+	if len(value) == 0 {
+		return nil, ic, false
+	}
+
+	return &Token{
+		// Unquoted identifiers are case-insensitive
+		value: strings.ToLower(string(value)),
+		loc:   ic.loc,
+		kind:  identifierKind,
+	}, cur, true
 }

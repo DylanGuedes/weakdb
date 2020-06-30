@@ -142,3 +142,236 @@ func TestKeywordLexer(t *testing.T) {
 		}
 	}
 }
+
+func TestLex(t *testing.T) {
+	tests := []struct {
+		input  string
+		tokens []Token
+		err    error
+	}{
+		{
+			input: "select a",
+			tokens: []Token{
+				{
+					loc:   location{col: 0, line: 0},
+					value: string(selectKeyword),
+					kind:  keywordKind,
+				},
+				{
+					loc:   location{col: 7, line: 0},
+					value: "a",
+					kind:  identifierKind,
+				},
+			},
+		},
+		{
+			input: "select true",
+			tokens: []Token{
+				{
+					loc:   location{col: 0, line: 0},
+					value: string(selectKeyword),
+					kind:  keywordKind,
+				},
+				{
+					loc:   location{col: 7, line: 0},
+					value: "true",
+					kind:  boolKind,
+				},
+			},
+		},
+		{
+			input: "select 1",
+			tokens: []Token{
+				{
+					loc:   location{col: 0, line: 0},
+					value: string(selectKeyword),
+					kind:  keywordKind,
+				},
+				{
+					loc:   location{col: 7, line: 0},
+					value: "1",
+					kind:  numericKind,
+				},
+			},
+			err: nil,
+		},
+		{
+			input: "select 'foo' || 'bar';",
+			tokens: []Token{
+				{
+					loc:   location{col: 0, line: 0},
+					value: string(selectKeyword),
+					kind:  keywordKind,
+				},
+				{
+					loc:   location{col: 7, line: 0},
+					value: "foo",
+					kind:  stringKind,
+				},
+				{
+					loc:   location{col: 13, line: 0},
+					value: string(concatSymbol),
+					kind:  symbolKind,
+				},
+				{
+					loc:   location{col: 16, line: 0},
+					value: "bar",
+					kind:  stringKind,
+				},
+				{
+					loc:   location{col: 21, line: 0},
+					value: string(semicolonSymbol),
+					kind:  symbolKind,
+				},
+			},
+			err: nil,
+		},
+		{
+			input: "CREATE TABLE u (id INT, name TEXT)",
+			tokens: []Token{
+				{
+					loc:   location{col: 0, line: 0},
+					value: string(createKeyword),
+					kind:  keywordKind,
+				},
+				{
+					loc:   location{col: 7, line: 0},
+					value: string(tableKeyword),
+					kind:  keywordKind,
+				},
+				{
+					loc:   location{col: 13, line: 0},
+					value: "u",
+					kind:  identifierKind,
+				},
+				{
+					loc:   location{col: 15, line: 0},
+					value: "(",
+					kind:  symbolKind,
+				},
+				{
+					loc:   location{col: 16, line: 0},
+					value: "id",
+					kind:  identifierKind,
+				},
+				{
+					loc:   location{col: 19, line: 0},
+					value: "int",
+					kind:  keywordKind,
+				},
+				{
+					loc:   location{col: 22, line: 0},
+					value: ",",
+					kind:  symbolKind,
+				},
+				{
+					loc:   location{col: 24, line: 0},
+					value: "name",
+					kind:  identifierKind,
+				},
+				{
+					loc:   location{col: 29, line: 0},
+					value: "text",
+					kind:  keywordKind,
+				},
+				{
+					loc:   location{col: 33, line: 0},
+					value: ")",
+					kind:  symbolKind,
+				},
+			},
+		},
+		{
+			input: "insert into users values (105, 233)",
+			tokens: []Token{
+				{
+					loc:   location{col: 0, line: 0},
+					value: string(insertKeyword),
+					kind:  keywordKind,
+				},
+				{
+					loc:   location{col: 7, line: 0},
+					value: string(intoKeyword),
+					kind:  keywordKind,
+				},
+				{
+					loc:   location{col: 12, line: 0},
+					value: "users",
+					kind:  identifierKind,
+				},
+				{
+					loc:   location{col: 18, line: 0},
+					value: string(valuesKeyword),
+					kind:  keywordKind,
+				},
+				{
+					loc:   location{col: 25, line: 0},
+					value: "(",
+					kind:  symbolKind,
+				},
+				{
+					loc:   location{col: 26, line: 0},
+					value: "105",
+					kind:  numericKind,
+				},
+				{
+					loc:   location{col: 30, line: 0},
+					value: ",",
+					kind:  symbolKind,
+				},
+				{
+					loc:   location{col: 32, line: 0},
+					value: "233",
+					kind:  numericKind,
+				},
+				{
+					loc:   location{col: 36, line: 0},
+					value: ")",
+					kind:  symbolKind,
+				},
+			},
+			err: nil,
+		},
+		{
+			input: "SELECT id FROM users;",
+			tokens: []Token{
+				{
+					loc:   location{col: 0, line: 0},
+					value: string(selectKeyword),
+					kind:  keywordKind,
+				},
+				{
+					loc:   location{col: 7, line: 0},
+					value: "id",
+					kind:  identifierKind,
+				},
+				{
+					loc:   location{col: 10, line: 0},
+					value: string(fromKeyword),
+					kind:  keywordKind,
+				},
+				{
+					loc:   location{col: 15, line: 0},
+					value: "users",
+					kind:  identifierKind,
+				},
+				{
+					loc:   location{col: 20, line: 0},
+					value: ";",
+					kind:  symbolKind,
+				},
+			},
+			err: nil,
+		},
+	}
+
+	for _, test := range tests {
+		tokens, err := LexParse(test.input)
+		assert.Equal(t, test.err, err, test.input)
+		assert.Equal(t, len(test.tokens), len(tokens), test.input)
+
+		for i, tok := range tokens {
+			assert.Equal(t, &test.tokens[i], tok, test.input)
+		}
+	}
+}
